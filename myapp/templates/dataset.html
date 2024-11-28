@@ -1,0 +1,264 @@
+<style>
+    /* Grid Layout */
+    .image-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 1rem;
+        padding: 1rem;
+    }
+    
+    .image-item {
+        position: relative;
+        aspect-ratio: 1;
+        cursor: pointer;
+        transition: transform 0.2s;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .image-item:hover {
+        transform: scale(1.02);
+    }
+    
+    .image-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .image-id-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        color: white;
+        padding: 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    /* Modal */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        z-index: 1000;
+        padding: 20px;
+    }
+    
+    .modal.active {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal-content {
+        background-color: white;
+        padding: 2rem;
+        border-radius: 0.5rem;
+        max-width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        position: relative;
+    }
+    
+    .close-button {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #666;
+        z-index: 1001;
+    }
+    
+    /* Modal Image */
+    .modal-image-container {
+        max-height: 70vh;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .modal-image {
+        max-width: 100%;
+        max-height: 70vh;
+        object-fit: contain;
+    }
+    
+    /* Captions */
+    .caption-container {
+        margin-top: 1rem;
+    }
+    
+    .caption {
+        border-left: 4px solid #3b82f6;
+        padding-left: 1rem;
+        margin-bottom: 0.5rem;
+        color: #4b5563;
+    }
+    
+    /* Loading Spinner */
+    .loading-spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3b82f6;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 2rem auto;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    /* Pagination */
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 2rem;
+        padding: 1rem;
+    }
+    
+    .pagination-button {
+        padding: 0.5rem 1rem;
+        background-color: #3b82f6;
+        color: white;
+        border-radius: 0.5rem;
+        text-decoration: none;
+        transition: background-color 0.2s;
+    }
+    
+    .pagination-button:hover {
+        background-color: #2563eb;
+    }
+</style>
+
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">COCO Dataset Browser</h1>
+        <span class="text-gray-600">Total Images: {{ total_images }}</span>
+    </div>
+
+    <!-- Image Grid -->
+    <div class="image-grid">
+        {% for item in page_obj %}
+        <div class="image-item" 
+             onclick='openModal("{{ item.url }}", "{{ item.image_id }}", "{{ item.captions|safe|escapejs }}")'>
+            <img src="{{ item.url }}" 
+                 alt="Dataset Image {{ item.image_id }}" 
+                 loading="lazy">
+            <div class="image-id-overlay">ID: {{ item.image_id }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Modal -->
+    <div id="imageModal" class="modal">
+        <div class="modal-content">
+            <button class="close-button" onclick="closeModal()">&times;</button>
+            <div id="modalContent">
+                <div class="modal-image-container">
+                    <div id="loadingSpinner" class="loading-spinner"></div>
+                    <img id="modalImage" class="modal-image" style="display: none;">
+                </div>
+                <div class="caption-container">
+                    <h3 id="modalImageId" class="text-xl font-semibold mb-4"></h3>
+                    <div id="modalCaptions" class="space-y-2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination">
+        {% if page_obj.has_previous %}
+        <a href="?page=1" class="pagination-button">&laquo; First</a>
+        <a href="?page={{ page_obj.previous_page_number }}" class="pagination-button">Previous</a>
+        {% endif %}
+
+        <span class="pagination-text">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        </span>
+
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}" class="pagination-button">Next</a>
+        <a href="?page={{ page_obj.paginator.num_pages }}" class="pagination-button">Last &raquo;</a>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function openModal(imageUrl, imageId, captions) {
+    const modal = document.getElementById('imageModal');
+    const modalImage = document.getElementById('modalImage');
+    const modalImageId = document.getElementById('modalImageId');
+    const modalCaptions = document.getElementById('modalCaptions');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+
+    // Show modal and loading spinner
+    modal.classList.add('active');
+    loadingSpinner.style.display = 'block';
+    modalImage.style.display = 'none';
+
+    // Set image ID
+    modalImageId.textContent = `Image ID: ${imageId}`;
+
+    // Clear previous captions
+    modalCaptions.innerHTML = '';
+
+    // Parse captions from JSON
+    try {
+        const captionsArray = JSON.parse(captions);
+        captionsArray.forEach(caption => {
+            const captionElement = document.createElement('p');
+            captionElement.className = 'caption';
+            captionElement.textContent = caption;
+            modalCaptions.appendChild(captionElement);
+        });
+    } catch (e) {
+        console.error("Error parsing captions JSON:", e);
+    }
+
+    // Load image
+    modalImage.onload = function() {
+        loadingSpinner.style.display = 'none';
+        modalImage.style.display = 'block';
+    };
+    modalImage.src = imageUrl;
+}
+
+function closeModal() {
+    const modal = document.getElementById('imageModal');
+    modal.classList.remove('active');
+}
+
+// Close modal when clicking outside
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('imageModal');
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            closeModal();
+        }
+    });
+
+    // Close modal with escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeModal();
+        }
+    });
+});
+</script>
