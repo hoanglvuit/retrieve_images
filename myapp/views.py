@@ -7,7 +7,8 @@ from django.core.paginator import Paginator
 
 # Initialize the ImageSearcher with your COCO annotations file path
 searcher = ImageSearcher(r'D:\CS336_IR\IR_Project\myproject\COCO_DATASET\coco2017\annotations\captions_train2017.json')
-
+def home(request):
+    return render(request, 'home.html')
 def search(request):
     results = []
     original_query = ""
