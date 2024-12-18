@@ -6,9 +6,9 @@ import spacy
 import numpy as np
 import os
 import pickle
-
+import faiss
 class ImageSearcher:
-    def __init__(self, ann_file_path, embeddings_cache_path='caption_embeddings_test.pkl'):
+    def __init__(self, ann_file_path, embeddings_cache_path='caption_embeddings_faiss.pkl'):
         self._download_nltk_data()
         
         self.coco = COCO(ann_file_path)
@@ -29,6 +29,9 @@ class ImageSearcher:
         
         # Load or compute caption embeddings
         self.captions, self.caption_embeddings = self._load_or_compute_embeddings()
+        
+        # Build FAISS index
+        self.index = self._build_faiss_index()
 
     def _download_nltk_data(self):
         """Download all required NLTK data"""
@@ -69,7 +72,7 @@ class ImageSearcher:
         # Compute embeddings for processed captions
         caption_embeddings = self.model.encode(
             processed_captions, 
-            convert_to_tensor=True, 
+            convert_to_numpy=True, 
             show_progress_bar=True
         )
         
@@ -83,13 +86,18 @@ class ImageSearcher:
             pickle.dump(cache_data, f)
         
         return captions, caption_embeddings
-    
+
+    def _build_faiss_index(self):
+        # Assuming self.caption_embeddings is a PyTorch tensor
+        caption_embeddings_cpu = self.caption_embeddings  # Move to CPU and convert to NumPy
+        index = faiss.IndexFlatL2(caption_embeddings_cpu.shape[1])  # Create a FAISS index
+        index.add(caption_embeddings_cpu)  # Add all embeddings to the index
+        return index
+
+
     def _lemmatize_text(self, text):
         """Process text with spaCy for lemmatization and cleaning"""
-        # Process the text with spaCy
         doc = self.nlp(text.lower())
-        
-        # Get lemmatized tokens, excluding stopwords and punctuation
         lemmatized_tokens = [
             token.lemma_ 
             for token in doc 
@@ -98,40 +106,30 @@ class ImageSearcher:
                 not token.is_space and
                 token.lemma_.strip())
         ]
-        
-        # Join tokens back into a string
         return ' '.join(lemmatized_tokens)
     
     def process_query(self, query):
         """Process query with lemmatization and basic cleaning"""
-        # Lemmatize the query
         processed_query = self._lemmatize_text(query)
-        
-        # If the processed query is empty, return the original query
         if not processed_query:
             return [query]
-        
-        return [processed_query]  # Return as list for compatibility
-    
-    def search_images(self, query, num_images=24, batch_size=512):
+        return [processed_query]
+
+    def search_images(self, query, num_images=24):
         processed_queries = self.process_query(query)
         all_results = []
         seen_image_ids = set()
         
-        # Load all annotations once
         all_ann_ids = self.coco.getAnnIds()
         all_anns = self.coco.loadAnns(all_ann_ids)
         
         for processed_query in processed_queries:
-            query_embedding = self.model.encode(processed_query, convert_to_tensor=True)
+            query_embedding = self.model.encode(processed_query, convert_to_numpy=True)
             
-            # Calculate similarities with cached embeddings
-            similarities = util.pytorch_cos_sim(query_embedding, self.caption_embeddings).squeeze().cpu().numpy()
+            # Use FAISS to find the nearest neighbors
+            distances, indices = self.index.search(query_embedding[np.newaxis, :], num_images)
             
-            # Get top K similar captions
-            sorted_indices = np.argsort(similarities)[-num_images:][::-1]
-            
-            for idx in sorted_indices:
+            for i, idx in enumerate(indices[0]):
                 ann = all_anns[idx]
                 img_id = ann['image_id']
                 
@@ -139,12 +137,11 @@ class ImageSearcher:
                     img = self.coco.loadImgs(img_id)[0]
                     all_results.append({
                         'url': img['coco_url'],
-                        'caption': self.captions[idx],  # Use original caption for display
-                        'similarity': float(similarities[idx]),
+                        'caption': self.captions[idx],
+                        'similarity': float(-distances[0][i]),  # Convert distance to similarity
                         'matched_query': processed_query
                     })
                     seen_image_ids.add(img_id)
         
-        # Sort all results by similarity score
         all_results.sort(key=lambda x: x['similarity'], reverse=True)
         return all_results[:num_images]
