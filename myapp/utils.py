@@ -126,8 +126,11 @@ class ImageSearcher:
         for processed_query in processed_queries:
             query_embedding = self.model.encode(processed_query, convert_to_numpy=True)
             
+            # Increase the search range to ensure we find enough unique images
+            search_range = min(num_images * 5, len(all_anns))
+            
             # Use FAISS to find the nearest neighbors
-            distances, indices = self.index.search(query_embedding[np.newaxis, :], num_images)
+            distances, indices = self.index.search(query_embedding[np.newaxis, :], search_range)
             
             for i, idx in enumerate(indices[0]):
                 ann = all_anns[idx]
@@ -142,6 +145,15 @@ class ImageSearcher:
                         'matched_query': processed_query
                     })
                     seen_image_ids.add(img_id)
+                    
+                    # Stop when we've found the desired number of unique images
+                    if len(all_results) >= num_images:
+                        break
+            
+            # Stop searching if we've found enough images
+            if len(all_results) >= num_images:
+                break
         
+        # Ensure we return exactly the number of images requested
         all_results.sort(key=lambda x: x['similarity'], reverse=True)
         return all_results[:num_images]
