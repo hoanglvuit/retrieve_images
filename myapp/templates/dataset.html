@@ -189,21 +189,27 @@
     </div>
 
     <!-- Pagination -->
-    <div class="pagination">
-        {% if page_obj.has_previous %}
-        <a href="?page=1" class="pagination-button">&laquo; First</a>
-        <a href="?page={{ page_obj.previous_page_number }}" class="pagination-button">Previous</a>
-        {% endif %}
+<div class="pagination">
+    {% if page_obj.has_previous %}
+    <a href="?page=1" class="pagination-button">&laquo; First</a>
+    <a href="?page={{ page_obj.previous_page_number }}" class="pagination-button">Previous</a>
+    {% endif %}
 
-        <span class="pagination-text">
-            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
-        </span>
-
-        {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}" class="pagination-button">Next</a>
-        <a href="?page={{ page_obj.paginator.num_pages }}" class="pagination-button">Last &raquo;</a>
+    <!-- Page Numbers -->
+    {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+            <span class="pagination-button" style="background-color: #2563eb;">{{ num }}</span>
+        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+            <a href="?page={{ num }}" class="pagination-button">{{ num }}</a>
         {% endif %}
-    </div>
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}" class="pagination-button">Next</a>
+    <a href="?page={{ page_obj.paginator.num_pages }}" class="pagination-button">Last &raquo;</a>
+    {% endif %}
+</div>
+
 </div>
 
 <script>

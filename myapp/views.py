@@ -4,7 +4,8 @@ from .forms import SearchForm
 from .utils import ImageSearcher
 from .models import SearchQuery
 from django.core.paginator import Paginator
-
+import json
+from django.core.serializers.json import DjangoJSONEncoder
 # Initialize the ImageSearcher with your COCO annotations file path
 searcher = ImageSearcher(r'D:\CS336_IR\IR_Project\myproject\COCO_DATASET\coco2017\annotations\captions_train2017.json')
 def home(request):
@@ -40,10 +41,6 @@ def search(request):
         'total_results': len(results)
     })
 
-# views.py
-from django.shortcuts import render
-from django.core.paginator import Paginator
-from .utils import ImageSearcher
 import json
 from django.core.serializers.json import DjangoJSONEncoder
 
