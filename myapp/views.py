@@ -13,7 +13,6 @@ def home(request):
 def search(request):
     results = []
     original_query = ""
-    processed_query = ""
     num_images = 24  # Default number of images
     
     if request.method == 'POST':
@@ -22,7 +21,6 @@ def search(request):
             query = form.cleaned_data['query']
             num_images = form.cleaned_data.get('num_images', 24)
             original_query = query
-            processed_query = searcher.process_query(query)
             
             # Save the search query
             SearchQuery.objects.create(query=query)
@@ -36,7 +34,6 @@ def search(request):
         'form': form,
         'results': results,
         'original_query': original_query,
-        'processed_query': processed_query,
         'num_images': num_images,
         'total_results': len(results)
     })
