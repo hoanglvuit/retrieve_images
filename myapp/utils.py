@@ -4,20 +4,37 @@ import numpy as np
 import os
 import pickle
 import faiss
-
+from typing import Dict, List, Tuple, Optional
+import torch
 class ImageSearcher:
-    def __init__(self, ann_file_path, embeddings_cache_path='caption_embeddings_faiss_3.pkl'):
+    def __init__(
+        self, 
+        ann_file_path: str,
+        model_name: str = 'clip-ViT-B-32',  # Default to CLIP
+        embeddings_cache_path: Optional[str] = None,
+        use_gpu: bool = False
+    ):
+
         self.coco = COCO(ann_file_path)
-        self.model = SentenceTransformer('multi-qa-mpnet-base-dot-v1')
+        self.model_name = model_name
+        
+        # If no cache path specified, create one based on model name
+        if embeddings_cache_path is None:
+            embeddings_cache_path = f'caption_embeddings_{model_name.replace("/", "_")}.pkl'
         self.embeddings_cache_path = embeddings_cache_path
+        
+        # Initialize the model
+        self.model = SentenceTransformer(model_name)
+        if use_gpu and torch.cuda.is_available():
+            self.model = self.model.to('cuda')
         
         # Load or compute caption embeddings
         self.captions, self.caption_embeddings = self._load_or_compute_embeddings()
         
-        # Build FAISS index
+        # Build FAISS index with appropriate metric based on model
         self.index = self._build_faiss_index()
-
-    def _load_or_compute_embeddings(self):
+    
+    def _load_or_compute_embeddings(self) -> Tuple[List[str], np.ndarray]:
         """Load embeddings from cache if available, otherwise compute and save them"""
         if os.path.exists(self.embeddings_cache_path):
             print("Loading cached embeddings...")
@@ -26,51 +43,77 @@ class ImageSearcher:
                 return cache_data['captions'], cache_data['embeddings']
         
         print("Computing embeddings (this may take a while)...")
-        # Get all annotations
         all_ann_ids = self.coco.getAnnIds()
         all_anns = self.coco.loadAnns(all_ann_ids)
         
-        # Extract captions
         captions = [ann['caption'] for ann in all_anns]
         
-        # Compute embeddings for captions
+        # Use batched encoding for better performance
         caption_embeddings = self.model.encode(
-            captions, 
-            convert_to_numpy=True, 
-            show_progress_bar=True
+            captions,
+            batch_size=32,
+            convert_to_numpy=True,
+            show_progress_bar=True,
+            normalize_embeddings=True  # Important for cosine similarity
         )
         
-        # Save to cache
         print("Saving embeddings to cache...")
         cache_data = {
-            'captions': captions,  # Store original captions for display
+            'captions': captions,
             'embeddings': caption_embeddings
         }
         with open(self.embeddings_cache_path, 'wb') as f:
             pickle.dump(cache_data, f)
         
         return captions, caption_embeddings
-
-    def _build_faiss_index(self):
-        # Assuming self.caption_embeddings is a NumPy array
-        index = faiss.IndexFlatL2(self.caption_embeddings.shape[1])  # Create a FAISS index
-        index.add(self.caption_embeddings)  # Add all embeddings to the index
+    
+    def _build_faiss_index(self) -> faiss.Index:
+        """Build appropriate FAISS index based on model type"""
+        dimension = self.caption_embeddings.shape[1]
+        
+        # For CLIP and other cosine similarity models
+        if self.model_name.startswith('clip-'):
+            index = faiss.IndexFlatIP(dimension)  # Inner product for normalized vectors
+        else:
+            # For other models that might work better with L2 distance
+            index = faiss.IndexFlatL2(dimension)
+        
+        # Add vectors to index
+        index.add(self.caption_embeddings)
         return index
-    def search_images(self, query, num_images=24):
-        query_embedding = self.model.encode(query, convert_to_numpy=True)
+    
+    def search_images(
+        self, 
+        query: str, 
+        num_images: int = 24,
+        threshold: float = None
+    ) -> List[Dict]:
+
+        # Encode query with same normalization as captions
+        query_embedding = self.model.encode(
+            query,
+            convert_to_numpy=True,
+            normalize_embeddings=True
+        )
         
-        # Increase the search range to ensure we find enough unique images
-        search_range = min(num_images * 5, len(self.captions))
+        # Search with larger k to account for duplicates
+        search_k = min(num_images * 5, len(self.captions))
+        distances, indices = self.index.search(
+            query_embedding[np.newaxis, :],
+            search_k
+        )
         
-        # Use FAISS to find the nearest neighbors
-        distances, indices = self.index.search(query_embedding[np.newaxis, :], search_range)
-        
+        # Process results
         all_results = []
         seen_image_ids = set()
         all_ann_ids = self.coco.getAnnIds()
         all_anns = self.coco.loadAnns(all_ann_ids)
-
+        
         for i, idx in enumerate(indices[0]):
+            similarity = float(distances[0][i])
+            if threshold and similarity < threshold:
+                continue
+                
             ann = all_anns[idx]
             img_id = ann['image_id']
             
@@ -79,14 +122,13 @@ class ImageSearcher:
                 all_results.append({
                     'url': img['coco_url'],
                     'caption': self.captions[idx],
-                    'similarity': float(-distances[0][i])  # Convert distance to similarity
+                    'similarity': similarity,
+                    'image_id': img_id
                 })
                 seen_image_ids.add(img_id)
                 
-                # Stop when we've found the desired number of unique images
                 if len(all_results) >= num_images:
                     break
         
-        # Ensure we return exactly the number of images requested
         all_results.sort(key=lambda x: x['similarity'], reverse=True)
         return all_results[:num_images]

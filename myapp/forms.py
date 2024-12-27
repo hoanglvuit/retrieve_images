@@ -11,7 +11,7 @@ class SearchForm(forms.Form):
     )   
     num_images = forms.IntegerField(
         min_value=1,
-        max_value=100,
+        max_value=200,
         initial=24,
         required=False,
         widget=forms.NumberInput(attrs={
