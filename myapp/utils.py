@@ -6,6 +6,7 @@ import pickle
 import faiss
 from typing import Dict, List, Tuple, Optional
 import torch
+from PIL import Image
 class ImageSearcher:
     def __init__(
         self, 
@@ -22,6 +23,7 @@ class ImageSearcher:
         self.model = SentenceTransformer(model_name)
         if use_gpu and torch.cuda.is_available():
             self.model = self.model.to('cuda')
+        print( self.embeddings_cache_path)
         self.captions, self.caption_embeddings = self._load_or_compute_embeddings()
         self.index = self._build_faiss_index()
     def _load_or_compute_embeddings(self) -> Tuple[List[str], np.ndarray]:
@@ -35,6 +37,8 @@ class ImageSearcher:
         all_ann_ids = self.coco.getAnnIds()
         all_anns = self.coco.loadAnns(all_ann_ids)
         captions = [ann['caption'] for ann in all_anns]
+        image_id = [ann['image_id'] for ann in all_anns]
+
         caption_embeddings = self.model.encode(
             captions,
             batch_size=32,
@@ -62,11 +66,18 @@ class ImageSearcher:
         index.add(self.caption_embeddings)
         return index
     def search_images(
-        self, 
-        query: str, 
+        self,
+        #query: str, 
+        query,
         num_images: int = 24,
         threshold: float = None
     ) -> List[Dict]:
+        # image = 'images.jpg'
+        # query_embedding = self.model.encode(
+        #     Image.open(image),
+        #     convert_to_numpy=True,
+        #     normalize_embeddings=True
+        # )
         query_embedding = self.model.encode(
             query,
             convert_to_numpy=True,
