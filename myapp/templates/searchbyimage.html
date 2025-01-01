@@ -9,10 +9,7 @@
     <style>
       .image-grid {
         display: grid;
-        grid-template-columns: repeat(
-          auto-fill,
-          minmax(250px, 1fr)
-        ); /* Slightly smaller cards */
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
         gap: 1rem;
         padding: 1rem;
       }
@@ -57,16 +54,14 @@
     <div class="container mt-5">
       <h1 class="text-center mb-4">COCO Image Search</h1>
 
-      <form method="post" class="mb-4">
+      <form method="post" enctype="multipart/form-data" class="mb-4">
         {% csrf_token %}
-        <div class="input-group">
-          {{ form.query }}
-          <button type="submit" class="btn btn-primary">Search</button>
+        <div class="mb-3">
+          <label for="image" class="form-label">Upload an image:</label>
+          {{ form.image }}
         </div>
         <div class="mt-2">
-          <label for="num_images" class="form-label"
-            >Number of images to show:</label
-          >
+          <label for="num_images" class="form-label">Number of images to show:</label>
           <input
             type="number"
             class="form-control"
@@ -77,13 +72,11 @@
             max="200"
           />
         </div>
+        <button type="submit" class="btn btn-primary mt-3">Search</button>
       </form>
 
       {% if results %}
       <div class="query-info">
-        <p class="mb-0">
-          <strong>Query:</strong> "{{ original_query }}"
-        </p>
         <p class="mb-0">
           <strong>Found:</strong> {{ total_results }} matching images
         </p>
@@ -98,9 +91,7 @@
           />
           <div class="caption">
             <p>{{ result.caption }}</p>
-            <small class="text-muted"
-              >Similarity: {{ result.similarity|floatformat:2 }}</small
-            >
+            <small class="text-muted">Similarity: {{ result.similarity|floatformat:2 }}</small>
           </div>
         </div>
         {% endfor %}
