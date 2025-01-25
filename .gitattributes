@@ -1,2 +1,4 @@
 static filter=lfs diff=lfs merge=lfs -text
 image_embeddings_clip-ViT-B-32.pkl filter=lfs diff=lfs merge=lfs -text
+caption_embeddings_clip-ViT-B-32.pkl filter=lfs diff=lfs merge=lfs -text
+design-resources/caption_embeddings_clip-ViT-B-32.pkl filter=lfs diff=lfs merge=lfs -text
