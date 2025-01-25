@@ -1,13 +1,9 @@
 #views.py
 from django.shortcuts import render
 from .forms import SearchFormfortext,SearchFormforimage
-<<<<<<< HEAD
 from .utils import ImageSearcher_COCO,ImageSearcher_humanface
 from .models import SearchQuery
-=======
-from .utils import ImageSearcher
 from .models import SearchQuery, UploadedImage
->>>>>>> 153c8412c2d4c4ae70b4b4373f8d9729bab32b08
 from django.core.paginator import Paginator
 import json
 from PIL import Image
@@ -26,12 +22,10 @@ def coco(request):
 def human_face(request) :
     return render(request, 'human_face.html')
 def search_byimage(request):
-<<<<<<< HEAD
+
     searcher = ImageSearcher_COCO(r'COCO_DATASET/coco2017/annotations/captions_train2017.json',
                                   embeddings_cache_path='caption_embeddings_clip-ViT-B-32.pkl')
-=======
     uploaded_image_url = None
->>>>>>> 153c8412c2d4c4ae70b4b4373f8d9729bab32b08
     results = []
     total_results = 0
     time_taken = 0
@@ -87,6 +81,8 @@ def search_byimage(request):
         },
     )
 def search_bytext(request):
+    searcher = ImageSearcher_COCO(r'COCO_DATASET/coco2017/annotations/captions_train2017.json',
+                                  embeddings_cache_path='caption_embeddings_clip-ViT-B-32.pkl')
     results = []
     original_query = ""
     num_images = 24  # Default number of images
