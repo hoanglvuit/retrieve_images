@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COCO Image Retrieval</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .hero {
+            background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('https://cocodataset.org/images/coco-thumb.jpg') center/cover;
+            color: white;
+            padding: 100px 20px;
+            text-align: center;
+        }
+        .hero h1 {
+            font-size: 3rem;
+        }
+        .hero p {
+            font-size: 1.2rem;
+            margin-top: 10px;
+        }
+        .btn-custom {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-transform: uppercase;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+        .btn-custom:hover {
+            background-color: #0056b3;
+        }
+        .links {
+            padding: 50px 20px;
+            text-align: center;
+        }
+        .links a {
+            margin: 0 15px;
+        }
+    </style>
+</head>
+<body>
+    <header class="hero">
+        <h1>COCO Image Retrieval</h1>
+        <p>Search and explore the COCO dataset with ease</p>
+        <a href="searchbyimage" class="btn btn-custom">Query By Image</a>
+        <a href="searchbytext" class="btn btn-custom">Query By Text</a>
+    </header>
+
+    <section class="links">
+        <p>&copy; 2024 COCO Image Retrieval. All rights reserved.</p>
+        <a href="searchbyimage">Search</a> |  <a href="searchbytext">Search</a>
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

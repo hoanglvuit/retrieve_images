@@ -5,6 +5,7 @@ from django.db import models
 from django.db import models
 
 class SearchQuery(models.Model):
+    objects = None
     query = models.CharField(max_length=200)
     timestamp = models.DateTimeField(auto_now_add=True)
 

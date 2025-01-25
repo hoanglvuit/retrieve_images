@@ -7,7 +7,7 @@ import faiss
 from typing import Dict, List, Tuple, Optional
 import torch
 from PIL import Image
-class ImageSearcher:
+class ImageSearcher_COCO:
     def __init__(
         self, 
         ann_file_path: str,
@@ -113,3 +113,74 @@ class ImageSearcher:
                     break
         all_results.sort(key=lambda x: x['similarity'], reverse=True)
         return all_results[:num_images]
+
+
+class ImageSearcher_humanface:
+    def __init__(
+            self,
+            image_folder: str,
+            model_name: str = 'clip-ViT-B-32',
+            embeddings_cache_path: Optional[str] = None,
+            use_gpu: bool = False
+    ):
+        self.image_folder = image_folder
+        self.model_name = model_name
+        self.embeddings_cache_path = embeddings_cache_path or f'image_embeddings_{model_name.replace("/", "_")}.pkl'
+        self.model = SentenceTransformer(model_name)
+        if use_gpu and torch.cuda.is_available():
+            self.model = self.model.to('cuda')
+        self.image_paths, self.image_embeddings = self._load_or_compute_embeddings()
+        self.index = self._build_faiss_index()
+
+    def _load_or_compute_embeddings(self) -> Tuple[List[str], np.ndarray]:
+        """Load embeddings from cache if available, otherwise compute and save them"""
+        if os.path.exists(self.embeddings_cache_path):
+            print("Loading cached embeddings...")
+            with open(self.embeddings_cache_path, 'rb') as f:
+                cache_data = pickle.load(f)
+                return cache_data['image_paths'], cache_data['embeddings']
+
+        print("Computing embeddings (this may take a while)...")
+        image_paths = [os.path.join(self.image_folder, fname) for fname in os.listdir(self.image_folder) if
+                       fname.endswith(('.jpg', '.png', '.jpeg'))]
+        image_embeddings = []
+
+        for img_path in image_paths:
+            image = Image.open(img_path).convert('RGB')  # Ensure image is in RGB format
+            embedding = self.model.encode(
+                image,  # Pass the image directly to the model
+                convert_to_numpy=True,
+                normalize_embeddings=True
+            )
+            image_embeddings.append(embedding)
+
+        image_embeddings = np.array(image_embeddings)
+        print("Saving embeddings to cache...")
+        cache_data = {
+            'image_paths': image_paths,
+            'embeddings': image_embeddings
+        }
+        with open(self.embeddings_cache_path, 'wb') as f:
+            pickle.dump(cache_data, f)
+
+        return image_paths, image_embeddings
+
+    def _build_faiss_index(self) -> faiss.Index:
+        """Build FAISS index for efficient similarity search"""
+        dimension = self.image_embeddings.shape[1]
+        index = faiss.IndexFlatIP(dimension)  # Inner product for cosine similarity
+        index.add(self.image_embeddings)
+        return index
+
+    def search(self, query, top_k: int = 5) -> List[Tuple[str, float]]:
+        """Search for similar images using a query image"""
+        #query_image = Image.open(query_image_path).convert('RGB')
+        query_embedding = self.model.encode(
+            query,
+            convert_to_numpy=True,
+            normalize_embeddings=True
+        )
+        query_embedding = np.array([query_embedding])  # Reshape for FAISS
+        distances, indices = self.index.search(query_embedding, top_k)
+        return [(self.image_paths[idx], float(dist)) for idx, dist in zip(indices[0], distances[0])]
+

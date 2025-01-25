@@ -1,18 +1,27 @@
 #views.py
 from django.shortcuts import render
 from .forms import SearchFormfortext,SearchFormforimage
-from .utils import ImageSearcher
+from .utils import ImageSearcher_COCO,ImageSearcher_humanface
 from .models import SearchQuery
 from django.core.paginator import Paginator
 import json
 from PIL import Image
 import time
+import os
+from django.conf import settings
+
 from django.core.serializers.json import DjangoJSONEncoder
 # Initialize the ImageSearcher with your COCO annotations file path
-searcher = ImageSearcher(r'COCO_DATASET/coco2017/annotations/captions_train2017.json')
+
 def home(request):
     return render(request, 'home.html')
+def coco(request):
+    return render(request, 'coco.html')
+def human_face(request) :
+    return render(request, 'human_face.html')
 def search_byimage(request):
+    searcher = ImageSearcher_COCO(r'COCO_DATASET/coco2017/annotations/captions_train2017.json',
+                                  embeddings_cache_path='caption_embeddings_clip-ViT-B-32.pkl')
     results = []
     num_images = 24  # Default number of images
     times = 0
@@ -76,6 +85,85 @@ def search_bytext(request):
         'time' : times,
     })
 
+
+def search_byimage1(request):
+    searcher = ImageSearcher_humanface(image_folder = r"static\Humans")
+    results = []
+    num_images = 24  # Default number of images
+    times = 0
+    if request.method == 'POST':
+        form = SearchFormforimage(request.POST, request.FILES)
+        if form.is_valid():
+            uploaded_image = form.cleaned_data['image']
+
+            # Process the uploaded image (e.g., extract features or descriptors)
+            image = Image.open(uploaded_image).convert('RGB')
+            num_images = form.cleaned_data.get('num_images', 24)
+            # Example: Pass the image to a searcher for visual-based search
+            # Assuming `search_images` can handle image input
+            start = time.time()
+            results = searcher.search(image, top_k=num_images)
+            end = time.time()
+            times = end - start
+            # Save the search action if needed (optional, for logging)
+            SearchQuery.objects.create(query="Image Search")
+
+    else:
+        form = SearchFormforimage()
+    # Convert absolute paths to relative paths
+    relative_results = []
+    for path, score in results:
+        re_path = path.split('Humans', 1)[1]
+        re_path = "Humans" + re_path
+        relative_results.append((re_path,score))
+    return render(request, 'searchbyimage1.html', {
+        'form': form,
+        'results': relative_results,
+        'num_images': num_images,
+        'total_results': len(results),
+        'time': times,
+        'STATIC_URL': settings.STATIC_URL,
+    })
+
+
+def search_bytext1(request):
+    searcher = ImageSearcher_humanface(image_folder=r"static\Humans")
+    results = []
+    original_query = ""
+    num_images = 24  # Default number of images
+    times = 0
+    if request.method == 'POST':
+        form = SearchFormfortext(request.POST)
+        if form.is_valid():
+            query = form.cleaned_data['query']
+            num_images = form.cleaned_data.get('num_images', 24)
+            original_query = query
+
+            # Save the search query
+            SearchQuery.objects.create(query=query)
+            start = time.time()
+            # Get search results with specified number of images
+            results = searcher.search(query, top_k=num_images)
+            end = time.time()
+            times = end - start
+    else:
+        form = SearchFormfortext()
+    # Convert absolute paths to relative paths
+    relative_results = []
+    for path, score in results:
+        re_path = path.split('Humans', 1)[1]
+        re_path = "Humans" + re_path
+        relative_results.append((re_path,score))
+    print(relative_results)
+    return render(request, 'searchbytext1.html', {
+        'form': form,
+        'results': relative_results,
+        'num_images': num_images,
+        'total_results': len(results),
+        'time': times,
+        'STATIC_URL': settings.STATIC_URL,
+    })
+
 import json
 from django.core.serializers.json import DjangoJSONEncoder
 
@@ -83,7 +171,7 @@ def dataset(request):
     page_number = request.GET.get('page', 1)
     items_per_page = 35
     
-    searcher = ImageSearcher(r'COCO_DATASET/coco2017/annotations/captions_train2017.json')
+    searcher = ImageSearcher_COCO(r'COCO_DATASET/coco2017/annotations/captions_train2017.json', embeddings_cache_path='caption_embeddings_clip-ViT-B-32.pkl')
     
     all_img_ids = searcher.coco.getImgIds()
     dataset_items = []
