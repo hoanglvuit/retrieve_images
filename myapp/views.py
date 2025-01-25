@@ -1,8 +1,13 @@
 #views.py
 from django.shortcuts import render
 from .forms import SearchFormfortext,SearchFormforimage
+<<<<<<< HEAD
 from .utils import ImageSearcher_COCO,ImageSearcher_humanface
 from .models import SearchQuery
+=======
+from .utils import ImageSearcher
+from .models import SearchQuery, UploadedImage
+>>>>>>> 153c8412c2d4c4ae70b4b4373f8d9729bab32b08
 from django.core.paginator import Paginator
 import json
 from PIL import Image
@@ -11,6 +16,7 @@ import os
 from django.conf import settings
 
 from django.core.serializers.json import DjangoJSONEncoder
+
 # Initialize the ImageSearcher with your COCO annotations file path
 
 def home(request):
@@ -20,40 +26,66 @@ def coco(request):
 def human_face(request) :
     return render(request, 'human_face.html')
 def search_byimage(request):
+<<<<<<< HEAD
     searcher = ImageSearcher_COCO(r'COCO_DATASET/coco2017/annotations/captions_train2017.json',
                                   embeddings_cache_path='caption_embeddings_clip-ViT-B-32.pkl')
+=======
+    uploaded_image_url = None
+>>>>>>> 153c8412c2d4c4ae70b4b4373f8d9729bab32b08
     results = []
-    num_images = 24  # Default number of images
-    times = 0
+    total_results = 0
+    time_taken = 0
+
     if request.method == 'POST':
         form = SearchFormforimage(request.POST, request.FILES)
         if form.is_valid():
-            uploaded_image = form.cleaned_data['image']
-            
-            # Process the uploaded image (e.g., extract features or descriptors)
-            image = Image.open(uploaded_image)
-            num_images = form.cleaned_data.get('num_images', 24)
-            # Example: Pass the image to a searcher for visual-based search
-            # Assuming `search_images` can handle image input
-            start = time.time()
-            results = searcher.search_images(image, num_images=num_images)
-            end =  time.time()
-            times = end - start
-            # Save the search action if needed (optional, for logging)
-            SearchQuery.objects.create(query="Image Search")
+            try:
+                # Save the uploaded image
+                uploaded_image = form.cleaned_data['image']
+                image_model = UploadedImage(image=uploaded_image)
+                image_model.save()
 
+                # Get the URL for displaying the uploaded image
+                uploaded_image_url = image_model.image.url
+
+                # Get number of images to show
+                num_images = form.cleaned_data.get('num_images', 24)
+
+                # Start timing
+                start_time = time.time()
+
+                # Open the uploaded image with PIL
+                query_image = Image.open(image_model.image.path)
+
+                # Use the existing searcher instance to perform the search
+                results = searcher.search_images(
+                    query=query_image,
+                    num_images=num_images
+                )
+
+                # Calculate time taken
+                time_taken = round(time.time() - start_time, 2)
+                total_results = len(results)
+
+            except Exception as e:
+                print(f"Error during image search: {str(e)}")
+                # You might want to add error handling here or show an error message to the user
+        else:
+            print("Form is invalid:", form.errors)
     else:
         form = SearchFormforimage()
-    
-    return render(request, 'searchbyimage.html', {
-        'form': form,
-        'results': results,
-        'num_images': num_images,
-        'total_results': len(results),
-        'time' : times,
-    })
 
-
+    return render(
+        request,
+        'searchbyimage.html',
+        {
+            'form': form,
+            'uploaded_image_url': uploaded_image_url,
+            'results': results,
+            'total_results': total_results,
+            'time': time_taken,
+        },
+    )
 def search_bytext(request):
     results = []
     original_query = ""
